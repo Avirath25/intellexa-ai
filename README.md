@@ -55,6 +55,22 @@ We've included an interactive visual guide to our architecture.
 
 ---
 
+## ☁️ Deployment to Render
+
+To make your INTELLEXA-AI live for the world, follow these steps:
+
+1.  **Create a Web Service** on [Render.com](https://render.com).
+2.  **Connect your GitHub Repository**.
+3.  **Use these Settings**:
+    - **Language**: `Node`
+    - **Build Command**: `npm install` (The project will auto-build the frontend)
+    - **Start Command**: `npm start`
+4.  **Click Deploy!**
+
+Render will automatically detect your `package.json` and host both the frontend and backend on a single URL.
+
+---
+
 ## 🏗️ Technology Stack
 
 - **Frontend**: React, Vite, Chart.js, Framer Motion

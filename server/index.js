@@ -1,13 +1,18 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { connectDatabase, connectDatabaseAsync, executeQuery, isConnected, disconnectDatabase } from './db-connector.js';
 import { analyzeSchema, getSchema, getSchemaContext } from './schema-engine.js';
 import { processNaturalLanguage, resetContext, setDbType } from './nl-to-sql.js';
 import { generateInsights } from './insight-generator.js';
 import { getDatabaseType } from './db-connector.js';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
@@ -164,6 +169,21 @@ app.get('/api/history', (req, res) => {
 app.delete('/api/history', (req, res) => {
     queryHistory.length = 0;
     res.json({ success: true });
+});
+
+// ═══════════════════════════════════════════════
+//  STATIC ASSETS & FRONTEND SERVING
+// ═══════════════════════════════════════════════
+
+// Serve static files from the 'dist' folder (created by npm run build)
+const clientDistPath = path.join(__dirname, '../dist');
+app.use(express.static(clientDistPath));
+
+// Fallback: serve index.html for any non-API routes (React Router support)
+app.get('*', (req, res) => {
+    if (!req.path.startsWith('/api')) {
+        res.sendFile(path.join(clientDistPath, 'index.html'));
+    }
 });
 
 // ═══════════════════════════════════════════════
