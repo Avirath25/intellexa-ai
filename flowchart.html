@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INTELLEXA-AI System Flowchart</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #6366f1, #22d3ee);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .subtitle {
+            text-align: center;
+            color: #94a3b8;
+            margin-bottom: 50px;
+            font-size: 1.1rem;
+        }
+        .flowchart {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            align-items: center;
+        }
+        .box {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(99, 102, 241, 0.3);
+            border-radius: 16px;
+            padding: 25px 35px;
+            min-width: 300px;
+            text-align: center;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .box:hover {
+            transform: translateY(-5px);
+            border-color: rgba(99, 102, 241, 0.6);
+            box-shadow: 0 10px 30px rgba(99, 102, 241, 0.2);
+        }
+        .box.start { border-color: rgba(34, 211, 238, 0.5); background: rgba(34, 211, 238, 0.08); }
+        .box.process { border-color: rgba(99, 102, 241, 0.5); background: rgba(99, 102, 241, 0.08); }
+        .box.decision { 
+            border-color: rgba(245, 158, 11, 0.5); 
+            background: rgba(245, 158, 11, 0.08);
+            clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+            padding: 40px 50px;
+            min-width: 350px;
+        }
+        .box.end { border-color: rgba(16, 185, 129, 0.5); background: rgba(16, 185, 129, 0.08); }
+        .icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+        .title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #f1f5f9;
+        }
+        .desc {
+            font-size: 0.95rem;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+        .arrow {
+            width: 3px;
+            height: 40px;
+            background: linear-gradient(180deg, rgba(99, 102, 241, 0.6), rgba(99, 102, 241, 0.2));
+            position: relative;
+        }
+        .arrow::after {
+            content: '▼';
+            position: absolute;
+            bottom: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #6366f1;
+            font-size: 1.2rem;
+        }
+        .split {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            align-items: flex-start;
+        }
+        .branch {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .label {
+            background: rgba(245, 158, 11, 0.2);
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            color: #fbbf24;
+            font-weight: 600;
+        }
+        @media (max-width: 768px) {
+            .split { flex-direction: column; }
+            h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧠 INTELLEXA-AI System Flow</h1>
+        <p class="subtitle">Natural Language to Database Insights Pipeline</p>
+        
+        <div class="flowchart">
+            <!-- Start -->
+            <div class="box start">
+                <div class="icon">🚀</div>
+                <div class="title">User Input</div>
+                <div class="desc">User asks a question in plain English<br>"Show all buses" or "Top 10 products"</div>
+            </div>
+            
+            <div class="arrow"></div>
+            
+            <!-- Process 1 -->
+            <div class="box process">
+                <div class="icon">🔍</div>
+                <div class="title">Intent Detection</div>
+                <div class="desc">AI analyzes query to detect intent:<br>List, Count, Trend, Top/Bottom, Visual, etc.</div>
+            </div>
+            
+            <div class="arrow"></div>
+            
+            <!-- Process 2 -->
+            <div class="box process">
+                <div class="icon">🗂️</div>
+                <div class="title">Table & Column Matching</div>
+                <div class="desc">Finds relevant tables and columns<br>from database schema</div>
+            </div>
+            
+            <div class="arrow"></div>
+            
+            <!-- Decision -->
+            <div class="box decision">
+                <div class="title">Generate SQL Query</div>
+                <div class="desc">Converts natural language to optimized SQL</div>
+            </div>
+            
+            <div class="arrow"></div>
+            
+            <!-- Process 3 -->
+            <div class="box process">
+                <div class="icon">⚡</div>
+                <div class="title">Execute Query</div>
+                <div class="desc">Runs SQL on connected database<br>(MySQL, PostgreSQL, SQLite)</div>
+            </div>
+            
+            <div class="arrow"></div>
+            
+            <!-- Split into two branches -->
+            <div class="split">
+                <div class="branch">
+                    <div class="label">Data Path</div>
+                    <div class="box process">
+                        <div class="icon">📊</div>
+                        <div class="title">Visualize Results</div>
+                        <div class="desc">Auto-generate charts:<br>Bar, Line, Pie, Table, KPI</div>
+                    </div>
+                </div>
+                
+                <div class="branch">
+                    <div class="label">AI Path</div>
+                    <div class="box process">
+                        <div class="icon">💡</div>
+                        <div class="title">Generate Insights</div>
+                        <div class="desc">AI analyzes data for:<br>Trends, Outliers, Patterns</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow"></div>
+            
+            <!-- End -->
+            <div class="box end">
+                <div class="icon">✅</div>
+                <div class="title">Display to User</div>
+                <div class="desc">Show results with charts, tables, and AI insights<br>in beautiful dashboard</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

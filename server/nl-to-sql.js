@@ -56,7 +56,7 @@ export function processNaturalLanguage(userInput) {
 
     if (relevantTables.length === 0) {
         return {
-            error: 'I couldn\'t determine which table to query. Could you mention a specific table or data type?',
+            error: `I couldn't find any table related to "${userInput}". Could you mention a specific table or data type?`,
             suggestion: `Available tables: ${tableNames.join(', ')}`
         };
     }
@@ -160,6 +160,9 @@ function generateSQL(input, intents, tables, schema) {
     // Detect time filters
     const timeFilter = detectTimeFilter(input);
 
+    // Detect specific columns mentioned by user
+    const requestedColumns = findRequestedColumns(inputLower, tables, schema);
+
     // Detect chart type
     let chartType = 'table';
 
@@ -215,23 +218,30 @@ function generateSQL(input, intents, tables, schema) {
     }
 
     // ── DEFAULT: LIST/SHOW ──
-    const limit = limitN || 50; // Increased limit for list queries
+    const limit = limitN || 50;
     const table = schema.tables.find(t => t.name === primaryTable);
     let selectCols = '*';
-    if (table) {
+    let description = `All ${primaryTable} records`;
+    
+    // If user requested specific columns, use only those
+    if (requestedColumns.length > 0) {
+        selectCols = requestedColumns.map(c => q(c)).join(', ');
+        description = `${requestedColumns.join(', ')} from ${primaryTable}`;
+    } else if (table) {
         const textCols = table.columns.filter(c => !c.name.toLowerCase().endsWith('_id') && c.name.toLowerCase() !== 'id');
         if (textCols.length > 0 && textCols.length < table.columns.length) {
             selectCols = table.columns.map(c => q(c.name)).join(', ');
         }
     }
+    
     const sql = `SELECT ${selectCols} FROM ${q(primaryTable)} LIMIT ${limit}`;
 
-    // If the user explicitly asked for a graph/chart, try to provide it
+    // If the user explicitly asked for a graph/chart, provide visualization
     if (intents.includes('visual')) {
-        return { sql, chartType: 'bar', description: `Visualizing ${primaryTable} data`, intent: 'visual' };
+        return { sql, chartType: 'bar', description, intent: 'visual' };
     }
 
-    return { sql, chartType: 'table', description: `All ${primaryTable} records`, intent: 'list' };
+    return { sql, chartType: 'table', description, intent: 'list' };
 }
 
 // ═══════════════════════════════════════════════
@@ -594,6 +604,25 @@ function buildJoinClause(tables, schema) {
     }
 
     return joinSQL;
+}
+
+function findRequestedColumns(input, tables, schema) {
+    const columns = [];
+    const table = schema.tables.find(t => t.name === tables[0]);
+    if (!table) return columns;
+
+    // Check each column in the table
+    for (const col of table.columns) {
+        const colLower = col.name.toLowerCase();
+        const colWithoutUnderscore = colLower.replace(/_/g, ' ');
+        
+        // Match exact column name or column name with spaces instead of underscores
+        if (input.includes(colLower) || input.includes(colWithoutUnderscore)) {
+            columns.push(col.name);
+        }
+    }
+
+    return columns;
 }
 
 function detectTimeFilter(input) {

@@ -71,6 +71,7 @@ export default function VisualizationPanel({ queryResult }) {
     const labelCol = textCols[0] || columns[0];
     const primaryNumCol = numCols.find(c => !c.toLowerCase().includes('id')) || numCols[0];
 
+    const ct = activeChart || chartType || 'table';
     const isListQuery = intent === 'list' && ct === 'table';
     const isKpiQuery = chartType === 'kpi' || (rows.length === 1 && numCols.length >= 1 && textCols.length === 0);
 
@@ -84,7 +85,6 @@ export default function VisualizationPanel({ queryResult }) {
     });
 
     const showInsights = !isListQuery && meaningfulInsights.length > 0;
-    const ct = activeChart || chartType || 'table';
 
     // ── Chart Data ──
     const chartLimit = 50;
