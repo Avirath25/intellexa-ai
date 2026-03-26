@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3';
 import mysql from 'mysql2/promise';
+import { MongoClient } from 'mongodb';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -10,6 +11,8 @@ let currentDb = null;
 let currentDbType = null;
 let currentDbPath = null;
 let mysqlPool = null;
+let mongoClient = null;
+let mongoDb = null;
 
 export function connectDatabase(config) {
     try {
@@ -96,6 +99,34 @@ export async function connectDatabaseAsync(config) {
             };
         }
 
+        if (config.type === 'mongodb') {
+            if (mongoClient) {
+                await mongoClient.close();
+                mongoClient = null;
+                mongoDb = null;
+            }
+            if (currentDb && currentDbType === 'sqlite') { currentDb.close(); currentDb = null; }
+            if (mysqlPool) { await mysqlPool.end(); mysqlPool = null; }
+
+            const uri = config.uri || `mongodb://${config.username ? `${config.username}:${config.password}@` : ''}${config.host || 'localhost'}:${config.port || 27017}/${config.database}`;
+            if (!config.database) return { success: false, message: 'Please provide a database name.' };
+
+            mongoClient = new MongoClient(uri, { serverSelectionTimeoutMS: 5000 });
+            await mongoClient.connect();
+            mongoDb = mongoClient.db(config.database);
+            // Verify connection
+            await mongoDb.command({ ping: 1 });
+
+            currentDbType = 'mongodb';
+            currentDb = mongoDb;
+
+            return {
+                success: true,
+                message: `Connected to MongoDB database "${config.database}"`,
+                type: 'mongodb'
+            };
+        }
+
         return { success: false, message: 'Unsupported database type' };
     } catch (error) {
         return { success: false, message: `Connection failed: ${error.message}` };
@@ -111,7 +142,11 @@ export function getDatabaseType() {
 }
 
 export function isConnected() {
-    return currentDb !== null || mysqlPool !== null;
+    return currentDb !== null || mysqlPool !== null || mongoClient !== null;
+}
+
+export function getMongoDb() {
+    return mongoDb;
 }
 
 export async function disconnectDatabase() {
@@ -122,9 +157,34 @@ export async function disconnectDatabase() {
     if (currentDb && currentDbType === 'sqlite') {
         currentDb.close();
     }
+    if (mongoClient) {
+        await mongoClient.close();
+        mongoClient = null;
+        mongoDb = null;
+    }
     currentDb = null;
     currentDbType = null;
     currentDbPath = null;
+}
+
+// sql param is reused as a serialized mongo command: JSON string { collection, pipeline }
+async function executeMongoQuery(command) {
+    try {
+        const { collection, pipeline } = JSON.parse(command);
+        const col = mongoDb.collection(collection);
+        const rows = await col.aggregate(pipeline).toArray();
+        // Flatten _id objects for display
+        const cleaned = rows.map(r => {
+            if (r._id && typeof r._id === 'object') {
+                const idVal = Object.values(r._id).join(' | ');
+                return { ...r._id, ...r, _id: idVal };
+            }
+            return r;
+        });
+        return { success: true, rows: cleaned, rowCount: cleaned.length };
+    } catch (error) {
+        return { success: false, rows: [], error: error.message };
+    }
 }
 
 export async function executeQuery(sql, params = []) {
@@ -133,6 +193,11 @@ export async function executeQuery(sql, params = []) {
     }
 
     try {
+        // MongoDB uses aggregation pipelines, not SQL
+        if (currentDbType === 'mongodb') {
+            return await executeMongoQuery(sql, params);
+        }
+
         const trimmed = sql.trim().toUpperCase();
         if (!trimmed.startsWith('SELECT') && !trimmed.startsWith('WITH') && !trimmed.startsWith('PRAGMA') && !trimmed.startsWith('SHOW')) {
             return { success: false, rows: [], error: 'Only SELECT queries are allowed for safety.' };

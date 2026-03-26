@@ -82,11 +82,12 @@ const DB_TYPES = [
     { id: 'sqlite', label: 'SQLite', icon: '📦', glow: '#22d3ee' },
     { id: 'mysql', label: 'MySQL', icon: '🐬', glow: '#10b981' },
     { id: 'postgresql', label: 'Postgres', icon: '🐘', glow: '#f59e0b' },
+    { id: 'mongodb', label: 'MongoDB', icon: '🍃', glow: '#4ade80' },
 ];
 
 export default function ConnectScreen({ onConnect }) {
     const [dbType, setDbType] = useState('demo');
-    const [form, setForm] = useState({ host: 'localhost', database: '', username: 'root', password: '', path: '' });
+    const [form, setForm] = useState({ host: 'localhost', port: '', database: '', username: '', password: '', path: '', uri: '' });
     const [status, setStatus] = useState(null);
     const [loading, setLoading] = useState(false);
     const heroText = useTypewriter('Ask your database anything.', 40);
@@ -203,6 +204,24 @@ export default function ConnectScreen({ onConnect }) {
                                 </div>
                                 <button className="btn-primary" onClick={() => handleConnect()} disabled={loading || !form.database}>
                                     {loading ? <><span className="spinner" /> Connecting...</> : `🔌 Connect to ${dbType.toUpperCase()}`}
+                                </button>
+                            </div>
+                        )}
+
+                        {dbType === 'mongodb' && (
+                            <div className="form-section">
+                                <div className="form-group"><label>Connection URI (optional)</label><input type="text" placeholder="mongodb://localhost:27017/mydb" value={form.uri} onChange={e => setForm({ ...form, uri: e.target.value })} /></div>
+                                <div className="form-row">
+                                    <div className="form-group"><label>Host</label><input type="text" placeholder="localhost" value={form.host} onChange={e => setForm({ ...form, host: e.target.value })} /></div>
+                                    <div className="form-group"><label>Port</label><input type="text" placeholder="27017" value={form.port} onChange={e => setForm({ ...form, port: e.target.value })} /></div>
+                                </div>
+                                <div className="form-row">
+                                    <div className="form-group"><label>Database</label><input type="text" placeholder="my_database" value={form.database} onChange={e => setForm({ ...form, database: e.target.value })} /></div>
+                                    <div className="form-group"><label>Username</label><input type="text" placeholder="(optional)" value={form.username} onChange={e => setForm({ ...form, username: e.target.value })} /></div>
+                                </div>
+                                <div className="form-group"><label>Password</label><input type="password" placeholder="(optional)" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} /></div>
+                                <button className="btn-primary" onClick={() => handleConnect()} disabled={loading || (!form.database && !form.uri)}>
+                                    {loading ? <><span className="spinner" /> Connecting...</> : '🍃 Connect to MongoDB'}
                                 </button>
                             </div>
                         )}

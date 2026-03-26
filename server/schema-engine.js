@@ -1,4 +1,4 @@
-import { getDatabase, getDatabaseType } from './db-connector.js';
+import { getDatabase, getDatabaseType, getMongoDb } from './db-connector.js';
 import mysql from 'mysql2/promise';
 
 let cachedSchema = null;
@@ -10,6 +10,8 @@ export async function analyzeSchema() {
 
     if (dbType === 'mysql') {
         return await analyzeMySQLSchema(db);
+    } else if (dbType === 'mongodb') {
+        return await analyzeMongoSchema(getMongoDb());
     } else {
         return analyzeSQLiteSchema(db);
     }
@@ -92,6 +94,53 @@ async function analyzeMySQLSchema(pool) {
                 type: 'many-to-one'
             });
         }
+    }
+
+    cachedSchema = schema;
+    return schema;
+}
+
+// ═══════════════════════════════════════
+//  MONGODB SCHEMA ANALYSIS
+// ═══════════════════════════════════════
+
+async function analyzeMongoSchema(db) {
+    const schema = { tables: [], relationships: [] };
+    const collections = await db.listCollections().toArray();
+
+    for (const col of collections) {
+        const name = col.name;
+        const sample = await db.collection(name).find({}).limit(20).toArray();
+        const rowCount = await db.collection(name).estimatedDocumentCount();
+
+        // Infer columns from sample documents
+        const fieldMap = {};
+        for (const doc of sample) {
+            for (const [key, val] of Object.entries(doc)) {
+                if (!fieldMap[key]) {
+                    let type = typeof val;
+                    if (val instanceof Date) type = 'date';
+                    else if (Array.isArray(val)) type = 'array';
+                    else if (val && typeof val === 'object') type = 'object';
+                    fieldMap[key] = type.toUpperCase();
+                }
+            }
+        }
+
+        schema.tables.push({
+            name,
+            columns: Object.entries(fieldMap).map(([k, v]) => ({
+                name: k,
+                type: v,
+                isPrimaryKey: k === '_id',
+                isNullable: true,
+                defaultValue: null
+            })),
+            primaryKeys: ['_id'],
+            foreignKeys: [],
+            indexes: [{ name: '_id_', unique: true }],
+            rowCount
+        });
     }
 
     cachedSchema = schema;

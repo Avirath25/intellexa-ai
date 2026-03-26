@@ -10,6 +10,7 @@ export function setDbType(type) {
 // Quote identifier based on DB type
 function q(name) {
     if (currentDbType === 'mysql') return `\`${name}\``;
+    if (currentDbType === 'mongodb') return name; // no quoting needed
     return `"${name}"`;
 }
 
@@ -61,6 +62,15 @@ export function processNaturalLanguage(userInput) {
         };
     }
 
+    // MongoDB: generate aggregation pipeline
+    if (currentDbType === 'mongodb') {
+        const result = generateMongoQuery(input, intent, relevantTables, schema);
+        conversationContext.lastTable = relevantTables[0];
+        conversationContext.lastQuery = result.sql;
+        conversationContext.history.push({ input: userInput, sql: result.sql });
+        return result;
+    }
+
     // Generate SQL based on intent
     const result = generateSQL(input, intent, relevantTables, schema);
 
@@ -70,6 +80,118 @@ export function processNaturalLanguage(userInput) {
     conversationContext.history.push({ input: userInput, sql: result.sql });
 
     return result;
+}
+
+// ═══════════════════════════════════════════════════════
+//  MONGODB AGGREGATION PIPELINE GENERATOR
+// ═══════════════════════════════════════════════════════
+
+function generateMongoQuery(input, intents, tables, schema) {
+    const collection = tables[0];
+    const tableSchema = schema.tables.find(t => t.name === collection);
+    const topMatch = input.match(/top\s*(\d+)/i);
+    const limitN = topMatch ? parseInt(topMatch[1]) : null;
+
+    // Find amount/numeric field
+    const amountPatterns = ['amount', 'total', 'price', 'revenue', 'cost', 'value', 'quantity', 'qty', 'sum', 'subtotal', 'sales'];
+    const amountField = tableSchema?.columns.find(c =>
+        amountPatterns.some(p => c.name.toLowerCase().includes(p)) &&
+        ['NUMBER', 'DOUBLE', 'INT', 'FLOAT', 'DECIMAL', 'OBJECT'].includes(c.type)
+    )?.name;
+
+    // Find date field
+    const datePatterns = ['date', 'created', 'timestamp', 'time', 'ordered', 'purchased', 'paid'];
+    const dateField = tableSchema?.columns.find(c =>
+        datePatterns.some(p => c.name.toLowerCase().includes(p))
+    )?.name;
+
+    // Find name/category field
+    const namePatterns = ['name', 'title', 'label', 'category', 'type', 'status'];
+    const nameField = tableSchema?.columns.find(c =>
+        namePatterns.some(p => c.name.toLowerCase().includes(p)) && c.name !== '_id'
+    )?.name;
+
+    let pipeline = [];
+    let chartType = 'table';
+    let description = `Data from ${collection}`;
+    let intent = intents[0] || 'list';
+
+    if (intents.includes('trend') && dateField) {
+        chartType = 'line';
+        intent = 'trend';
+        pipeline = [
+            { $group: { _id: { $dateToString: { format: '%Y-%m', date: `$${dateField}` } }, total: amountField ? { $sum: `$${amountField}` } : { $sum: 1 }, count: { $sum: 1 } } },
+            { $sort: { '_id': 1 } }
+        ];
+        description = `Monthly trend from ${collection}`;
+    } else if ((intents.includes('top') || intents.includes('bottom')) && nameField) {
+        chartType = 'bar';
+        intent = intents.includes('top') ? 'top' : 'bottom';
+        const sortDir = intents.includes('bottom') ? 1 : -1;
+        const limit = limitN || 10;
+        pipeline = [
+            { $group: { _id: `$${nameField}`, total: amountField ? { $sum: `$${amountField}` } : { $sum: 1 } } },
+            { $sort: { total: sortDir } },
+            { $limit: limit }
+        ];
+        description = `${intent === 'top' ? 'Top' : 'Bottom'} ${limit} from ${collection}`;
+    } else if (intents.includes('count')) {
+        chartType = 'kpi';
+        intent = 'count';
+        if (nameField) {
+            pipeline = [
+                { $group: { _id: `$${nameField}`, count: { $sum: 1 } } },
+                { $sort: { count: -1 } }
+            ];
+            description = `Count by ${nameField} in ${collection}`;
+        } else {
+            pipeline = [{ $count: 'total_count' }];
+            description = `Total count in ${collection}`;
+        }
+    } else if ((intents.includes('sum') || intents.includes('percentage')) && amountField) {
+        chartType = 'bar';
+        intent = 'sum';
+        if (nameField) {
+            pipeline = [
+                { $group: { _id: `$${nameField}`, total: { $sum: `$${amountField}` } } },
+                { $sort: { total: -1 } }
+            ];
+            description = `Total ${amountField} by ${nameField}`;
+        } else {
+            pipeline = [{ $group: { _id: null, grand_total: { $sum: `$${amountField}` }, average: { $avg: `$${amountField}` }, count: { $sum: 1 } } }];
+            description = `Summary of ${amountField} in ${collection}`;
+        }
+    } else if (intents.includes('average') && amountField) {
+        chartType = 'bar';
+        intent = 'average';
+        if (nameField) {
+            pipeline = [
+                { $group: { _id: `$${nameField}`, average: { $avg: `$${amountField}` }, count: { $sum: 1 } } },
+                { $sort: { average: -1 } }
+            ];
+            description = `Average ${amountField} by ${nameField}`;
+        } else {
+            pipeline = [{ $group: { _id: null, average: { $avg: `$${amountField}` } } }];
+            description = `Average ${amountField} in ${collection}`;
+        }
+    } else if (intents.includes('distribution') && nameField) {
+        chartType = 'pie';
+        intent = 'distribution';
+        pipeline = [
+            { $group: { _id: `$${nameField}`, count: amountField ? { $sum: `$${amountField}` } : { $sum: 1 } } },
+            { $sort: { count: -1 } }
+        ];
+        description = `Distribution by ${nameField}`;
+    } else {
+        // Default: list documents
+        const limit = limitN || 50;
+        pipeline = [{ $limit: limit }];
+        description = `Documents from ${collection}`;
+    }
+
+    // Serialize as JSON command for executeMongoQuery
+    const sql = JSON.stringify({ collection, pipeline });
+    return { sql, chartType, description, intent };
 }
 
 function detectIntent(input) {

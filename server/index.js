@@ -41,9 +41,10 @@ app.post('/api/connect', async (req, res) => {
         }
 
         let result;
-        if (type === 'mysql') {
+        if (type === 'mysql' || type === 'mongodb') {
             result = await connectDatabaseAsync({
-                type, host, port, database, username, password
+                type, host, port, database, username, password,
+                uri: req.body.uri
             });
         } else {
             result = connectDatabase({
